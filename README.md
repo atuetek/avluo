@@ -264,7 +264,8 @@ pnpm test
 | `apps/api` | `nest build` | ✅ passing | `apps/api/dist/` |
 | `apps/pwa` | `ng build` | ✅ passing | `apps/pwa/dist/pwa/` (224 kB initial, 64 kB gzipped) |
 | Prisma | `prisma validate` | ✅ valid | 19 Modelle |
-| RLS | `psql ...` | ⚠️ manuell | siehe Quickstart Schritt 8 |
+| RLS | `psql ...` | ✅ scripted | siehe Quickstart Schritt 8 |
+| Seed | `prisma db seed` | ✅ passing | 1 Tenant + 4 Users + 4 Members + 3 Posts + 1 Event |
 
 ---
 
