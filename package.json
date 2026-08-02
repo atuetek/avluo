@@ -1,0 +1,23 @@
+{
+  "name": "avluo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-Tenant Social-Media-App für türkische Wohnsiedlungen (Kooperatif)",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "db:migrate": "pnpm --filter @avluo/api run prisma:migrate",
+    "db:rls": "psql $DATABASE_URL -f apps/api/prisma/rls-policies.sql",
+    "db:seed": "pnpm --filter @avluo/api run prisma:seed",
+    "db:reset": "pnpm db:down && pnpm db:up && pnpm db:migrate && pnpm db:rls && pnpm db:seed"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

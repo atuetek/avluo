@@ -1,0 +1,26 @@
+/* Avluo · Globale Styles */
+:root {
+  --color-primary: #ff5a3c;
+  --color-primary-hover: #e84a2c;
+  --color-bg: #ffffff;
+  --color-fg: #1a1a1a;
+  --color-muted: #6b6b75;
+  --color-border: #e8e8ec;
+  --radius: 12px;
+  --font-display: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
