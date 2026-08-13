@@ -1,6 +1,6 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Global, Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PrismaService } from './common/prisma/prisma.service';
+import { CommonModule } from './common/common.module';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { MembersModule } from './modules/members/members.module';
@@ -11,8 +11,10 @@ import { PollsModule } from './modules/polls/polls.module';
 import { EmergencyModule } from './modules/emergency/emergency.module';
 import { MediaModule } from './modules/media/media.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { AuditService } from './common/audit/audit.service';
 
+// JwtModule als Global, damit alle Module JwtService injekten können
+// ohne JwtModule explizit zu importieren
+@Global()
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -21,6 +23,15 @@ import { AuditService } from './common/audit/audit.service';
         signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
       }),
     }),
+  ],
+  exports: [JwtModule],
+})
+class JwtGlobalModule {}
+
+@Module({
+  imports: [
+    CommonModule,
+    JwtGlobalModule,
     AuthModule,
     MembersModule,
     PostsModule,
@@ -31,8 +42,6 @@ import { AuditService } from './common/audit/audit.service';
     MediaModule,
     AdminModule,
   ],
-  providers: [PrismaService, AuditService],
-  exports: [PrismaService, AuditService, JwtModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
