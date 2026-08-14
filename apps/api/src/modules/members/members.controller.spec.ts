@@ -30,11 +30,26 @@ const MEMBER_AYSE = {
   isActive: true,
 };
 
+const MEMBER_HANS = {
+  id: '00000000-0000-0000-0000-000000000050',
+  tenantId: '00000000-0000-0000-0000-000000000001',
+  userId: '00000000-0000-0000-0000-000000000051',
+  houseNumber: 'A-8',
+  blockName: 'Block A',
+  role: 'MEMBER',
+  displayName: 'Hans Schmidt',
+  isVerified: true,
+  preferredLang: 'de-DE',
+  isActive: true,
+};
+
 // Mock JWT-Token, der einen eingeloggten User mit tenant_id simuliert
 const MOCK_TOKEN_PAYLOAD = {
   sub: MEMBER_AYSE.userId,
   tid: MEMBER_AYSE.tenantId,
 };
+
+const ALL_TENANT_MEMBERS = [MEMBER_AYSE, MEMBER_HANS];
 
 describe('Members API', () => {
   let app: INestApplication;
@@ -64,9 +79,21 @@ describe('Members API', () => {
           }
           return Promise.resolve(null);
         }),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockImplementation(({ where }) => {
+          // GET /api/members: filter by tenantId
+          if (where?.tenantId === MEMBER_AYSE.tenantId) {
+            return Promise.resolve(ALL_TENANT_MEMBERS);
+          }
+          return Promise.resolve([]);
+        }),
+        count: jest.fn().mockResolvedValue(ALL_TENANT_MEMBERS.length),
         create: jest.fn(),
-        update: jest.fn(),
+        update: jest.fn().mockImplementation(({ where, data }) => {
+          if (where.id === MEMBER_AYSE.id) {
+            return Promise.resolve({ ...MEMBER_AYSE, ...data });
+          }
+          return Promise.resolve(null);
+        }),
         delete: jest.fn(),
       },
       tenant: {
@@ -197,6 +224,90 @@ describe('Members API', () => {
       (jwt.verifyAsync as jest.Mock).mockResolvedValue(MOCK_TOKEN_PAYLOAD);
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('GET /api/members', () => {
+    it('returns all members of the tenant (paginated)', async () => {
+      // Mock findMany für die Liste
+      mockPrisma.member.findMany.mockResolvedValue(ALL_TENANT_MEMBERS);
+      mockPrisma.member.count.mockResolvedValue(ALL_TENANT_MEMBERS.length);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members?limit=20&offset=0')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        members: expect.arrayContaining([
+          expect.objectContaining({ id: MEMBER_AYSE.id, displayName: 'Ayşe Yılmaz' }),
+          expect.objectContaining({ id: MEMBER_HANS.id, displayName: 'Hans Schmidt' }),
+        ]),
+        total: 2,
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    it('returns empty list with total=0 when no members match', async () => {
+      mockPrisma.member.findMany.mockResolvedValue([]);
+      mockPrisma.member.count.mockResolvedValue(0);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members?limit=20&offset=0')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .expect(200);
+
+      expect(res.body).toEqual({ members: [], total: 0, limit: 20, offset: 0 });
+    });
+
+    it('rejects limit > 100 (DOS-Schutz)', async () => {
+      await request(app.getHttpServer())
+        .get('/api/members?limit=500&offset=0')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .expect(400);
+    });
+  });
+
+  describe('PATCH /api/members/me', () => {
+    it('updates the authenticated member profile', async () => {
+      const updated = { ...MEMBER_AYSE, displayName: 'Ayşe Y.', houseNumber: 'A-12' };
+      mockPrisma.member.update.mockResolvedValue(updated);
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/members/me')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .send({ displayName: 'Ayşe Y.', houseNumber: 'A-12' })
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        id: MEMBER_AYSE.id,
+        displayName: 'Ayşe Y.',
+        houseNumber: 'A-12',
+      });
+    });
+
+    it('rejects update without body', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/members/me')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .send({})
+        .expect(400);
+    });
+
+    it('rejects forbidden fields like role or tenantId', async () => {
+      // Security: User darf nicht seine Rolle selbst ändern
+      await request(app.getHttpServer())
+        .patch('/api/members/me')
+        .set('Authorization', 'Bearer mock-token')
+        .set('x-dev-tenant', 'yesiltepe')
+        .send({ role: 'SUPER_ADMIN', displayName: 'Hacker' })
+        .expect(400); // forbidNonWhitelisted wirft 400
     });
   });
 });
