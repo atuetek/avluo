@@ -1,4 +1,10 @@
-import { Global, Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import {
+  Global,
+  Module,
+  MiddlewareConsumer,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { CommonModule } from './common/common.module';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
@@ -45,7 +51,14 @@ class JwtGlobalModule {}
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Tenant-Middleware auf alle API-Routes
-    consumer.apply(TenantMiddleware).forRoutes('*');
+    // Tenant-Middleware auf alle API-Routes AUSSER Auth
+    // (Auth-Endpoints sind tenant-übergreifend – der User loggt sich ja erst ein)
+    consumer
+      .apply(TenantMiddleware)
+      .exclude(
+        { path: 'api/auth/send-otp', method: RequestMethod.POST },
+        { path: 'api/auth/verify-otp', method: RequestMethod.POST },
+      )
+      .forRoutes('*');
   }
 }
