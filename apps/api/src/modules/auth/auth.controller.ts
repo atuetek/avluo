@@ -96,12 +96,11 @@ export class AuthController {
     });
 
     if (!user) {
-      // User-Onboarding: neuen User anlegen
+      // User-Onboarding
       user = await this.prisma.user.create({
         data: {
           phone: dto.phone,
           phoneVerified: false,
-          emailVerified: undefined,
           locale: dto.locale || 'tr-TR',
         },
       });
@@ -153,7 +152,7 @@ export class AuthController {
       throw new BadRequestException('User nicht gefunden.');
     }
 
-    // phone als verifiziert markieren
+    // Phone als verifiziert markieren (idempotent)
     if (!user.phoneVerified) {
       await this.prisma.user.update({
         where: { id: user.id },
@@ -161,17 +160,17 @@ export class AuthController {
       });
     }
 
-    // Tenant aus Request-Subdomain (von TenantMiddleware gesetzt)
-    // Phase 1: vereinfacht – Tenant kommt aus req.host
-    // In Phase 2: Subdomain-Resolution im Controller
-    const tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+    // TODO(Phase 2): Tenant aus Request-Body oder Subdomain-Header lesen.
+    // Aktuell: DEFAULT_TENANT_ID aus ENV (für Pilot-Setup Yeşiltepe).
+    // Sicherheit: In Production darf dieser Endpoint NICHT ohne Tenant-Validation sein,
+    // sonst könnte sich ein User in jeden Tenant einloggen.
+    const tenantId =
+      process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 
-    // Member im Tenant suchen
     const member = await this.prisma.member.findFirst({
       where: { userId: user.id, tenantId },
     });
 
-    // JWT ausstellen
     const token = await this.jwt.signAsync({
       sub: user.id,
       tid: tenantId,
@@ -180,17 +179,9 @@ export class AuthController {
 
     return {
       token,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        locale: user.locale,
-      },
+      user: { id: user.id, phone: user.phone, locale: user.locale },
       member: member
-        ? {
-            id: member.id,
-            tenantId: member.tenantId,
-            role: member.role,
-          }
+        ? { id: member.id, tenantId: member.tenantId, role: member.role }
         : null,
     };
   }
