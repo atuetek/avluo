@@ -45,9 +45,11 @@ model Tenant {
   polls           Poll[]
   pollVotes       PollVote[]
   emergencyAlerts EmergencyAlert[]
+  emergencyAcks   EmergencyAck[]
   media           Media[]
   invites         Invite[]
   auditLogs       AuditLog[]
+  notifications   Notification[]
 
   @@map("tenants")
 }
@@ -102,6 +104,9 @@ model Member {
   eventRsvps               EventRsvp[]
   pollVotes                PollVote[]
   emergencyAlertsTriggered EmergencyAlert[]
+  emergencyAcks            EmergencyAck[]
+  eventsOrganized          Event[]
+  notifications            Notification[]
   Poll                     Poll[]
 
   // Eindeutigkeit: 1 User pro Tenant nur 1x
@@ -135,11 +140,30 @@ model User {
   lastLoginAt   DateTime?
 
   // Relations
-  members       Member[]
-  sessions      Session[]
-  oauthAccounts OAuthAccount[]
+  members             Member[]
+  sessions            Session[]
+  oauthAccounts       OAuthAccount[]
+  webAuthnCredentials WebAuthnCredential[]
 
   @@map("users")
+}
+
+/// WebAuthn / Passkey credentials for passwordless re-login
+model WebAuthnCredential {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  credentialId String   @unique @db.Text
+  publicKey    String   @db.Text
+  counter      BigInt   @default(0)
+  transports   String?  @db.Text // comma-separated
+  deviceName  String?  @db.VarChar(100)
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webauthn_credentials")
 }
 
 model Session {
@@ -199,6 +223,9 @@ model Post {
   isHidden     Boolean @default(false)
   hiddenReason String? @db.VarChar(200)
   hiddenBy     String? @db.Uuid
+
+  // Soft-delete (author or admin)
+  deletedAt DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -355,8 +382,9 @@ model Event {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  rsvps  EventRsvp[]
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organizer Member      @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  rsvps     EventRsvp[]
 
   @@index([tenantId, startsAt])
   @@map("events")
@@ -468,11 +496,36 @@ model EmergencyAlert {
   createdAt         DateTime          @default(now())
   resolvedAt        DateTime?
 
-  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  triggeredByMember Member @relation(fields: [triggeredBy], references: [id], onDelete: Cascade)
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  triggeredByMember Member         @relation(fields: [triggeredBy], references: [id], onDelete: Cascade)
+  acks              EmergencyAck[]
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("emergency_alerts")
+}
+
+model EmergencyAck {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String              @db.Uuid
+  alertId   String              @db.Uuid
+  memberId  String              @db.Uuid
+  status    EmergencyAckStatus  @default(SAFE)
+  note      String?             @db.VarChar(500)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alert  EmergencyAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  member Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, alertId, memberId])
+  @@index([tenantId, alertId])
+  @@map("emergency_acks")
+}
+
+enum EmergencyAckStatus {
+  SAFE
+  NEED_HELP
 }
 
 enum EmergencyType {
@@ -534,6 +587,30 @@ model Invite {
 
   @@index([tenantId, code])
   @@map("invites")
+}
+
+// ============================================================================
+// NOTIFICATIONS (In-App)
+// ============================================================================
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @db.Uuid
+  memberId  String    @db.Uuid
+  type      String    @db.VarChar(50) // comment, like, dm, event, sos
+  title     String    @db.VarChar(200)
+  body      String    @db.Text
+  refType   String?   @db.VarChar(50)
+  refId     String?   @db.Uuid
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId, createdAt(sort: Desc)])
+  @@index([tenantId, memberId, readAt])
+  @@map("notifications")
 }
 
 // ============================================================================

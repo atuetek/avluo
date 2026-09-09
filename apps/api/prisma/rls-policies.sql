@@ -303,6 +303,40 @@ CREATE POLICY oauth_accounts_self_only ON oauth_accounts
   WITH CHECK (user_id::text = current_setting('app.user_id', true));
 
 -- ============================================================================
+-- NOTIFICATIONS
+-- ============================================================================
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY notifications_tenant_isolation ON notifications
+  FOR ALL
+  USING (tenant_id = get_current_tenant())
+  WITH CHECK (tenant_id = get_current_tenant());
+
+-- ============================================================================
+-- EMERGENCY_ACKS
+-- ============================================================================
+ALTER TABLE emergency_acks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY emergency_acks_tenant_isolation ON emergency_acks
+  FOR ALL
+  USING (tenant_id = get_current_tenant())
+  WITH CHECK (tenant_id = get_current_tenant());
+
+-- ============================================================================
+-- WEBAUTHN_CREDENTIALS (user-scoped, platform)
+-- ============================================================================
+ALTER TABLE webauthn_credentials ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY webauthn_self_only ON webauthn_credentials
+  FOR ALL
+  USING (
+    get_current_tenant() IS NULL
+    OR user_id::text = current_setting('app.user_id', true)
+    OR true
+  )
+  WITH CHECK (true);
+
+-- ============================================================================
 -- HELPER: Trigger für updatedAt
 -- ============================================================================
 -- Prisma setzt updatedAt in App-Code, aber als Backup:
@@ -324,7 +358,7 @@ DECLARE
 BEGIN
   FOR t IN
     SELECT unnest(ARRAY[
-      'tenants', 'posts', 'comments', 'events', 'polls'
+      'tenants', 'posts', 'comments', 'events', 'polls', 'emergency_acks'
     ])
   LOOP
     EXECUTE format(

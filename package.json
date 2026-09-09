@@ -7,13 +7,21 @@
     "dev": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
+    "test:e2e": "pnpm --filter @avluo/api test:e2e && pnpm --filter @avluo/pwa test:e2e",
+    "test:e2e:api": "pnpm --filter @avluo/api test:e2e",
+    "test:e2e:pwa": "pnpm --filter @avluo/pwa test:e2e",
     "lint": "pnpm -r run lint",
     "db:up": "docker compose -f docker/docker-compose.yml up -d",
     "db:down": "docker compose -f docker/docker-compose.yml down",
     "db:migrate": "pnpm --filter @avluo/api run prisma:migrate",
     "db:rls": "psql $DATABASE_URL -f apps/api/prisma/rls-policies.sql",
     "db:seed": "pnpm --filter @avluo/api run prisma:seed",
-    "db:reset": "pnpm db:down && pnpm db:up && pnpm db:migrate && pnpm db:rls && pnpm db:seed"
+    "db:reset": "pnpm db:down && pnpm db:up && pnpm db:migrate && pnpm db:rls && pnpm db:seed",
+    "setup:soft-launch": "bash scripts/setup-soft-launch.sh",
+    "smoke": "bash scripts/smoke-mvp.sh",
+    "native:ios": "pnpm --filter @avluo/pwa run native:ios",
+    "native:android": "pnpm --filter @avluo/pwa run native:android",
+    "native:sync": "pnpm --filter @avluo/pwa run native:sync"
   },
   "engines": {
     "node": ">=20.0.0",

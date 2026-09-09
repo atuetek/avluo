@@ -1,0 +1,15 @@
+namespace:
+  name: avluo-prod
+image:
+  repository: redis
+  tag: "7-alpine"
+resources:
+  requests:
+    cpu: 15m
+    memory: 24Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+# Soft-launch: cap RAM, eviction under pressure
+maxmemory: "48mb"
+maxmemoryPolicy: allkeys-lru

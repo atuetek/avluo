@@ -1,0 +1,202 @@
+stages:
+  - test
+  - dockerize
+  - publish
+
+variables:
+  API_IMAGE: "$CI_REGISTRY_IMAGE/api"
+  PWA_IMAGE: "$CI_REGISTRY_IMAGE/pwa"
+  KUBERNETES_NAMESPACE_PROD: avluo-prod
+
+test:unit:
+  stage: test
+  image: node:20-bookworm
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: avluo_test
+    POSTGRES_PASSWORD: test
+    POSTGRES_DB: avluo_test
+    DATABASE_URL: postgresql://avluo_test:test@postgres:5432/avluo_test
+    JWT_SECRET: test-secret-32-chars-minimum-padding
+  before_script:
+    - corepack enable && corepack prepare pnpm@9.15.9 --activate
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm --filter @avluo/api prisma generate
+    - pnpm --filter @avluo/api test -- --forceExit
+    - pnpm --filter @avluo/api build
+    - pnpm --filter @avluo/pwa build --configuration=production
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "master"
+
+test:e2e:api:
+  stage: test
+  image: node:20-bookworm
+  variables:
+    JWT_SECRET: test-secret-32-chars-minimum-padding
+  before_script:
+    - corepack enable && corepack prepare pnpm@9.15.9 --activate
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm --filter @avluo/api prisma generate
+    - pnpm --filter @avluo/api test:e2e -- --forceExit
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "master"
+
+test:e2e:pwa:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.49.1-jammy
+  variables:
+    CI: "true"
+  before_script:
+    - corepack enable && corepack prepare pnpm@9.15.9 --activate
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm --filter @avluo/pwa test:e2e
+  artifacts:
+    when: always
+    paths:
+      - apps/pwa/e2e-results.xml
+      - apps/pwa/test-results/
+    reports:
+      junit: apps/pwa/e2e-results.xml
+    expire_in: 7 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "master"
+
+.docker_job: &docker_job
+  stage: dockerize
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - apk add --no-cache jq
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "master"
+
+docker:api:
+  <<: *docker_job
+  script:
+    - API_VERSION=$(jq -r '.version' apps/api/package.json)
+    - docker build -f apps/api/Dockerfile -t "$API_IMAGE:$API_VERSION" -t "$API_IMAGE:latest" .
+    - docker push "$API_IMAGE:$API_VERSION"
+    - docker push "$API_IMAGE:latest"
+    - echo "API_VERSION=$API_VERSION" >> docker.env
+  artifacts:
+    reports:
+      dotenv: docker.env
+
+docker:pwa:
+  <<: *docker_job
+  script:
+    - PWA_VERSION=$(jq -r '.version' apps/pwa/package.json)
+    - docker build -f apps/pwa/Dockerfile -t "$PWA_IMAGE:$PWA_VERSION" -t "$PWA_IMAGE:latest" .
+    - docker push "$PWA_IMAGE:$PWA_VERSION"
+    - docker push "$PWA_IMAGE:latest"
+    - echo "PWA_VERSION=$PWA_VERSION" >> docker.env
+  artifacts:
+    reports:
+      dotenv: docker.env
+
+.deploy-prod-template: &deploy-prod-template
+  stage: publish
+  image: alpine/k8s:1.28.2
+  before_script:
+    - apk add --no-cache helm jq curl bash
+    - |
+      if [ -z "${KUBECONFIG_PROD:-}" ]; then
+        echo "ERROR: Set CI variable KUBECONFIG_PROD (base64 kubeconfig)"
+        exit 1
+      fi
+    - mkdir -p ~/.kube
+    - echo "$KUBECONFIG_PROD" | base64 -d > ~/.kube/config
+    - kubectl config use-context "${KUBERNETES_CONTEXT_PROD:-default}"
+    - |
+      if ! kubectl get namespace "$KUBERNETES_NAMESPACE_PROD" >/dev/null 2>&1; then
+        kubectl create namespace "$KUBERNETES_NAMESPACE_PROD"
+      fi
+    - bash infra/scripts/update-registry-secret.sh prod --non-interactive || true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+  environment:
+    name: production
+    url: https://app.avluo.app
+
+deploy:prod:redis:
+  <<: *deploy-prod-template
+  script:
+    - |
+      helm upgrade --install redis ./infra/helm/redis \
+        --namespace "$KUBERNETES_NAMESPACE_PROD" \
+        -f ./infra/helm/redis/values-prod.yaml \
+        --wait --timeout 3m
+
+deploy:prod:api:
+  <<: *deploy-prod-template
+  needs:
+    - job: docker:api
+      artifacts: true
+      optional: true
+  script:
+    - |
+      if [ -z "${API_VERSION:-}" ]; then
+        API_VERSION=$(jq -r '.version' apps/api/package.json)
+      fi
+    - |
+      EXTRA=""
+      [ -n "${AVLUO_DATABASE_URL:-}" ] && EXTRA="$EXTRA --set-string secrets.databaseUrl=$AVLUO_DATABASE_URL"
+      [ -n "${AVLUO_JWT_SECRET:-}" ] && EXTRA="$EXTRA --set-string secrets.jwtSecret=$AVLUO_JWT_SECRET"
+      [ -n "${AVLUO_S3_ACCESS_KEY:-}" ] && EXTRA="$EXTRA --set-string secrets.s3AccessKey=$AVLUO_S3_ACCESS_KEY"
+      [ -n "${AVLUO_S3_SECRET_KEY:-}" ] && EXTRA="$EXTRA --set-string secrets.s3SecretKey=$AVLUO_S3_SECRET_KEY"
+      [ -n "${AVLUO_S3_ENDPOINT:-}" ] && EXTRA="$EXTRA --set-string config.s3Endpoint=$AVLUO_S3_ENDPOINT"
+      [ -n "${AVLUO_MEDIA_PUBLIC_BASE_URL:-}" ] && EXTRA="$EXTRA --set-string config.mediaPublicBaseUrl=$AVLUO_MEDIA_PUBLIC_BASE_URL"
+      helm upgrade --install api ./infra/helm/api \
+        --namespace "$KUBERNETES_NAMESPACE_PROD" \
+        -f ./infra/helm/api/values-prod.yaml \
+        --set image.repository="$API_IMAGE" \
+        --set image.tag="$API_VERSION" \
+        --set image.pullPolicy=IfNotPresent \
+        $EXTRA \
+        --wait --timeout 5m
+    - kubectl get pods -n "$KUBERNETES_NAMESPACE_PROD" -l app.kubernetes.io/name=api
+
+deploy:prod:pwa:
+  <<: *deploy-prod-template
+  needs:
+    - job: docker:pwa
+      artifacts: true
+      optional: true
+  script:
+    - |
+      if [ -z "${PWA_VERSION:-}" ]; then
+        PWA_VERSION=$(jq -r '.version' apps/pwa/package.json)
+      fi
+    - |
+      helm upgrade --install pwa ./infra/helm/pwa \
+        --namespace "$KUBERNETES_NAMESPACE_PROD" \
+        -f ./infra/helm/pwa/values-prod.yaml \
+        --set image.repository="$PWA_IMAGE" \
+        --set image.tag="$PWA_VERSION" \
+        --set image.pullPolicy=IfNotPresent \
+        --wait --timeout 5m
+    - kubectl get pods -n "$KUBERNETES_NAMESPACE_PROD" -l app.kubernetes.io/name=pwa
+
+refresh:registry-secrets:prod:
+  <<: *deploy-prod-template
+  script:
+    - bash infra/scripts/update-registry-secret.sh prod --non-interactive --restart

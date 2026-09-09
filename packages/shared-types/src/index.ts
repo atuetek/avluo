@@ -32,6 +32,20 @@ export interface Post {
   isAnnouncement: boolean;
   likeCount: number;
   commentCount: number;
+  likedByMe?: boolean;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  tenantId: string;
+  memberId: string;
+  type: 'comment' | 'like' | 'dm' | 'event' | 'sos' | string;
+  title: string;
+  body: string;
+  refType?: string;
+  refId?: string;
+  readAt?: string | null;
   createdAt: string;
 }
 
@@ -43,5 +57,19 @@ export interface EmergencyAlert {
   title: string;
   message: string;
   recipients: number;
+  acknowledgedCount?: number;
   createdAt: string;
+}
+
+export interface EventItem {
+  id: string;
+  tenantId: string;
+  title: string;
+  description: string;
+  location?: string;
+  startsAt: string;
+  endsAt?: string;
+  rsvpCount: number;
+  myRsvp?: 'GOING' | 'MAYBE' | 'NOT_GOING' | null;
+  isCancelled: boolean;
 }

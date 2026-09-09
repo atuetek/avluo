@@ -14,13 +14,29 @@ export class AuditService {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    // TODO: Phase 2 - in Audit-Log-Tabelle schreiben
-    // Phase 1: console.log reicht
     if (process.env.NODE_ENV !== 'test') {
-      console.log('[AUDIT]', JSON.stringify({
-        ...params,
-        timestamp: new Date().toISOString(),
-      }));
+      console.log(
+        '[AUDIT]',
+        JSON.stringify({ ...params, timestamp: new Date().toISOString() }),
+      );
+    }
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId: params.tenantId || null,
+          userId: params.userId || null,
+          action: params.action,
+          resource: params.resource || null,
+          metadata: params.metadata ?? undefined,
+          ipAddress: params.ipAddress || null,
+          userAgent: params.userAgent || null,
+        },
+      });
+    } catch (err) {
+      // Never fail the request because of audit write
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('[AUDIT] write failed', err);
+      }
     }
   }
 }

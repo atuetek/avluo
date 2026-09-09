@@ -17,9 +17,8 @@ import { PollsModule } from './modules/polls/polls.module';
 import { EmergencyModule } from './modules/emergency/emergency.module';
 import { MediaModule } from './modules/media/media.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
-// JwtModule als Global, damit alle Module JwtService injekten können
-// ohne JwtModule explizit zu importieren
 @Global()
 @Module({
   imports: [
@@ -47,17 +46,28 @@ class JwtGlobalModule {}
     EmergencyModule,
     MediaModule,
     AdminModule,
+    NotificationsModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Tenant-Middleware auf alle API-Routes AUSSER Auth
-    // (Auth-Endpoints sind tenant-übergreifend – der User loggt sich ja erst ein)
     consumer
       .apply(TenantMiddleware)
       .exclude(
         { path: 'api/auth/send-otp', method: RequestMethod.POST },
         { path: 'api/auth/verify-otp', method: RequestMethod.POST },
+        {
+          path: 'api/auth/passkey/authenticate/options',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/auth/passkey/authenticate/verify',
+          method: RequestMethod.POST,
+        },
+        { path: 'health', method: RequestMethod.GET },
+        { path: 'health/db', method: RequestMethod.GET },
+        { path: 'health/live', method: RequestMethod.GET },
+        { path: 'health/ready', method: RequestMethod.GET },
       )
       .forRoutes('*');
   }

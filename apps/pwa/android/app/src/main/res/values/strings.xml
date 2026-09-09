@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Avluo</string>
+    <string name="title_activity_main">Avluo</string>
+    <string name="package_name">com.avluo.yesiltepe</string>
+    <string name="custom_url_scheme">com.avluo.yesiltepe</string>
+</resources>

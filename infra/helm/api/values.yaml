@@ -1,0 +1,31 @@
+replicaCount: 1
+image:
+  repository: registry.gitlab.com/avluo/avluo/api
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+namespace:
+  name: avluo-prod
+environment: production
+imagePullSecrets:
+  enabled: true
+  secretName: avluo-registry-secret
+service:
+  type: ClusterIP
+  port: 3000
+ingress:
+  enabled: false
+resources: {}
+config:
+  redisUrl: redis://redis:6379
+  appBaseUrl: http://localhost:4200
+  webauthnRpId: localhost
+  webauthnOrigin: http://localhost:4200
+  defaultTenantId: "00000000-0000-0000-0000-000000000001"
+  s3Endpoint: ""
+  mediaPublicBaseUrl: ""
+  corsOrigin: "*"
+secrets:
+  databaseUrl: ""
+  jwtSecret: ""
+  s3AccessKey: ""
+  s3SecretKey: ""

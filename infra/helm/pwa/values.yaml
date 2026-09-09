@@ -1,0 +1,19 @@
+replicaCount: 1
+image:
+  repository: registry.gitlab.com/avluo/avluo/pwa
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+namespace:
+  name: avluo-prod
+imagePullSecrets:
+  enabled: true
+  secretName: avluo-registry-secret
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+resources: {}
+config:
+  apiUrl: http://localhost:3000
+  tenantSlug: yesiltepe

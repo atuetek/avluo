@@ -5,9 +5,18 @@
   "description": "Avluo Angular 19 PWA",
   "scripts": {
     "dev": "ng serve --host 0.0.0.0",
-    "build": "ng build",
+    "build": "ng build --configuration=production",
+    "build:dev": "ng build --configuration=development",
     "test": "ng test",
-    "lint": "ng lint"
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "lint": "ng lint",
+    "cap:sync": "cap sync",
+    "cap:open:ios": "cap open ios",
+    "cap:open:android": "cap open android",
+    "native:ios": "pnpm build:dev && cap sync ios && cap open ios",
+    "native:android": "pnpm build:dev && cap sync android && cap open android",
+    "native:sync": "pnpm build:dev && cap sync"
   },
   "dependencies": {
     "@angular/animations": "^19.0.0",
@@ -19,7 +28,18 @@
     "@angular/platform-browser-dynamic": "^19.0.0",
     "@angular/router": "^19.0.0",
     "@angular/service-worker": "^19.0.0",
+    "@aparajita/capacitor-biometric-auth": "^6.0.1",
     "@avluo/shared-types": "workspace:*",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/haptics": "^6",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/keyboard": "^6",
+    "@capacitor/splash-screen": "^6",
+    "@capacitor/status-bar": "^6",
+    "@simplewebauthn/browser": "^14.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
     "zone.js": "~0.15.0"
@@ -28,6 +48,7 @@
     "@angular-devkit/build-angular": "^19.0.0",
     "@angular/cli": "^19.0.0",
     "@angular/compiler-cli": "^19.0.0",
+    "@playwright/test": "1.49.1",
     "@types/node": "^20.0.0",
     "typescript": "~5.6.0"
   }

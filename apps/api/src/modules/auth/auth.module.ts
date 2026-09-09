@@ -1,13 +1,12 @@
-// AuthModule: AuthController + SmsService
-//
-// Phase 1 minimal: SMS via Logging, später Netgsm
-// JwtModule ist global im AppModule, kein expliziter Import nötig
-
 import { Module } from '@nestjs/common';
 import { AuthController, SmsService } from './auth.controller';
+import { PasskeyController } from './passkey.controller';
+import { HealthController } from './health.controller';
+import { JwtModule_ } from '../../common/jwt/jwt.module';
 
 @Module({
-  controllers: [AuthController],
+  imports: [JwtModule_],
+  controllers: [AuthController, PasskeyController, HealthController],
   providers: [SmsService],
   exports: [SmsService],
 })

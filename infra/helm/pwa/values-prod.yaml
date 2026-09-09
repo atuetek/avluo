@@ -1,0 +1,46 @@
+replicaCount: 1
+
+image:
+  repository: registry.gitlab.com/avluo/avluo/pwa
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+fullnameOverride: "pwa"
+
+namespace:
+  name: avluo-prod
+
+imagePullSecrets:
+  enabled: true
+  secretName: avluo-registry-secret
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: app.avluo.app
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: avluo-pwa-tls
+      hosts:
+        - app.avluo.app
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 50m
+    memory: 48Mi
+
+config:
+  apiUrl: https://api.avluo.app
+  tenantSlug: yesiltepe

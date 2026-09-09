@@ -1,0 +1,64 @@
+replicaCount: 1
+
+image:
+  repository: registry.gitlab.com/avluo/avluo/api
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+nameOverride: ""
+fullnameOverride: "api"
+
+namespace:
+  name: avluo-prod
+
+environment: production
+
+imagePullSecrets:
+  enabled: true
+  secretName: avluo-registry-secret
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: api.avluo.app
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: avluo-api-tls
+      hosts:
+        - api.avluo.app
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 160Mi
+  limits:
+    cpu: 300m
+    memory: 320Mi
+
+nodeOptions: "--max-old-space-size=192"
+
+config:
+  redisUrl: redis://redis:6379
+  appBaseUrl: https://app.avluo.app
+  webauthnRpId: avluo.app
+  webauthnOrigin: https://app.avluo.app
+  defaultTenantId: "00000000-0000-0000-0000-000000000001"
+  s3Endpoint: ""
+  mediaPublicBaseUrl: ""
+  corsOrigin: "https://app.avluo.app"
+
+# Set via CI: --set-string secrets.databaseUrl=... --set-string secrets.jwtSecret=...
+secrets:
+  databaseUrl: ""
+  jwtSecret: ""
+  s3AccessKey: ""
+  s3SecretKey: ""

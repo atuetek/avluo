@@ -23,6 +23,10 @@ Avluo ist eine **Social-Media-App für Wohnsiedlungen (Kooperatif)**. Jede Siedl
 
 Mehr Architektur-Details: [`docs/architecture.md`](docs/architecture.md) (öffne [`docs/architecture.html`](docs/architecture.html) im Browser für Diagramm)
 
+**Native iOS/Android:** Capacitor-Shell — Anleitung in [`docs/NATIVE.md`](docs/NATIVE.md) (`pnpm native:ios` / `pnpm native:android`).
+
+**Prod Deploy (GitLab → Hetzner):** [`docs/DEPLOY.md`](docs/DEPLOY.md) · Soft-Launch: `pnpm setup:soft-launch` + `pnpm smoke` · E2E: [`docs/E2E.md`](docs/E2E.md) · Monitoring: [`docs/MONITORING.md`](docs/MONITORING.md)
+
 ---
 
 ## Stack
@@ -245,14 +249,16 @@ pnpm -r run build   # Läuft durch alle Apps
 cd apps/api && pnpm prisma validate  # Schema muss valid sein
 ```
 
-### Tests (geplant ab Woche 9)
+### Tests
 
 ```bash
-# E2E (Phase 1 Sprint 4+):
-pnpm --filter @avluo/api run test:e2e
+# Unit
+pnpm --filter @avluo/api test
 
-# Unit (Phase 1 Sprint 4+):
-pnpm test
+# E2E API + PWA (siehe docs/E2E.md)
+pnpm test:e2e
+pnpm test:e2e:api
+pnpm test:e2e:pwa
 ```
 
 ---
